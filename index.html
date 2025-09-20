@@ -574,7 +574,7 @@
                 });
                 return;
             }
-            filePreview = { url: pasteUrl, name: pasteUrl, size: 0, type: "" };
+            filePreview = { url: pasteUrl, name: pasteUrl, size: 0, type: "", file: null };
             runAnalysis("url");
         });
 
@@ -582,7 +582,7 @@
             const f = e.target.files?.[0];
             if (!f) return;
             const url = URL.createObjectURL(f);
-            filePreview = { url, name: f.name, size: f.size, type: f.type };
+            filePreview = { url, name: f.name, size: f.size, type: f.type, file: f };
             report = null;
             updateUI();
         });
@@ -592,7 +592,7 @@
             const f = e.dataTransfer?.files?.[0];
             if (!f) return;
             const url = URL.createObjectURL(f);
-            filePreview = { url, name: f.name, size: f.size, type: f.type };
+            filePreview = { url, name: f.name, size: f.size, type: f.type, file: f };
             report = null;
             updateUI();
         });
@@ -645,7 +645,7 @@
         });
 
         runSampleBtn.addEventListener("click", () => {
-            filePreview = { url: "https://placehold.co/400x300/e2e8f0/64748b?text=Sample+Image", name: "error.jpg", size: 0, type: "" };
+            filePreview = { url: "https://placehold.co/400x300/e2e8f0/64748b?text=Sample+Image", name: "error.jpg", size: 0, type: "", file: null };
             runAnalysis("sample");
         });
 
@@ -776,14 +776,12 @@
             // Real API call for other images
             try {
                 let base64Data;
-                if (filePreview && filePreview.url.startsWith('blob:')) {
+                if (filePreview && filePreview.file) {
                     base64Data = await new Promise((resolve, reject) => {
                         const reader = new FileReader();
-                        reader.onload = () => {
-                            resolve(reader.result.split(',')[1]);
-                        };
+                        reader.onload = () => resolve(reader.result.split(',')[1]);
                         reader.onerror = reject;
-                        fetch(filePreview.url).then(res => res.blob()).then(blob => reader.readAsDataURL(blob));
+                        reader.readAsDataURL(filePreview.file);
                     });
                 } else {
                     clearInterval(interval);
