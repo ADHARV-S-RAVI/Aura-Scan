@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraScan Interactive</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-gray-50 to-white text-gray-900 dark:from-gray-900 dark:to-gray-800 dark:text-gray-100">
+
+    <!-- Modal Markup -->
+    <div id="modal-container" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 id="modal-title" class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2"></h3>
+            <p id="modal-message" class="text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap"></p>
+            <input id="modal-input" type="text" class="w-full rounded-md border px-3 py-2 dark:bg-gray-700 dark:border-gray-600 mb-4 text-gray-900 dark:text-gray-100 hidden" placeholder="">
+            <div class="flex justify-end space-x-2">
+                <button id="modal-confirm" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors hidden">OK</button>
+                <button id="modal-close" class="px-4 py-2 border rounded-md dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="app" class="min-h-screen">
+        <nav class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">AS</div>
+                <div>
+                    <div class="text-lg font-semibold">AuraScan</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Trust what you see. Verify with AuraScan.</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="theme-toggle" class="px-3 py-2 rounded-md border hover:bg-gray-100 dark:hover:bg-gray-700">Toggle Theme</button>
+                <a href="#analyze" class="px-4 py-2 bg-indigo-600 text-white rounded-md">Analyze Media</a>
+                <a href="https://chromewebstore.google.com/detail/upintel-ai-fake-job-detec/knbbafgpgdjpenknicfagioijfhcomfp" class="px-4 py-2 border rounded-md">Download Extension</a>
+            </div>
+        </nav>
+
+        <header class="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <div>
+                <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Trust what you see. <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-pink-500">Verify with AuraScan.</span></h1>
+                <p class="mt-4 text-gray-600 dark:text-gray-300">An AI-powered platform to detect deepfakes, verify provenance, and help creators protect their work. Privacy-first by design.</p>
+                <div class="mt-6 flex gap-3">
+                    <a href="#analyze" class="px-6 py-3 bg-indigo-600 text-white rounded-md shadow">Analyze Media</a>
+                    <a href="https://chromewebstore.google.com/detail/upintel-ai-fake-job-detec/knbbafgpgdjpenknicfagioijfhcomfp" class="px-6 py-3 border rounded-md">Download Extension</a>
+                </div>
+                <div class="mt-6 text-sm text-gray-500 dark:text-gray-400">Free · Privacy-first · Community-reviewed</div>
+            </div>
+            <div class="bg-white/60 dark:bg-gray-800/60 backdrop-blur-md rounded-xl p-6 shadow-lg">
+                <label class="text-sm font-medium">Paste image/video/audio URL</label>
+                <div class="mt-2 flex gap-2">
+                    <input id="paste-url" type="text" class="flex-1 rounded-md border px-3 py-2 dark:bg-gray-700 dark:border-gray-600" placeholder="https://" />
+                    <button id="paste-analyze-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-md">Analyze</button>
+                </div>
+                <div id="analyze" class="mt-4 border-2 border-dashed rounded-md p-4 text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Drag & drop a file here, or</p>
+                    <div class="mt-3 inline-flex items-center gap-2">
+                        <label class="inline-flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-md cursor-pointer dark:bg-gray-700">
+                            <input id="file-input" type="file" accept="image/*,video/*,audio/*" class="hidden" />
+                            <span class="text-sm">Browse files</span>
+                        </label>
+                        <select id="privacy-mode-select" class="ml-3 rounded-md border px-2 py-2 dark:bg-gray-700">
+                            <option value="local">Local Quick Check</option>
+                            <option value="server">Full Server Analysis</option>
+                        </select>
+                    </div>
+                    <div id="file-preview" class="hidden mt-4 flex items-center gap-4 text-left">
+                        <img id="preview-image" alt="preview" class="w-28 h-20 object-cover rounded border dark:border-gray-600" />
+                        <div class="flex-1">
+                            <div id="file-name" class="font-medium"></div>
+                            <div id="file-size" class="text-xs text-gray-500"></div>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <button id="upload-analyze-btn" class="px-3 py-2 bg-sky-600 text-white rounded-md">Analyze</button>
+                            <button id="generate-hash-btn" class="px-3 py-2 border rounded-md">Generate Auth Hash</button>
+                        </div>
+                    </div>
+                    <div id="supported-info" class="mt-3 text-xs text-gray-400">Supported: JPG, PNG, MP4, MP3. For videos we analyze frames + audio (mock).</div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <section class="lg:col-span-2 bg-white rounded-lg shadow p-5 dark:bg-gray-800">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-semibold">Report</h2>
+                    <div class="text-sm text-gray-500">Privacy: <strong id="privacy-mode-display" class="capitalize">local</strong></div>
+                </div>
+                <div id="report-content">
+                    <div class="mt-6 text-gray-500">No analysis yet — upload or paste URL and click Analyze.</div>
+                </div>
+            </section>
+            
+            <aside class="bg-white rounded-lg shadow p-5 dark:bg-gray-800">
+                <h3 class="font-semibold">Quick actions</h3>
+                <div class="mt-3 space-y-2">
+                    <button id="export-history-btn" class="w-full px-3 py-2 bg-sky-600 text-white rounded">Export History</button>
+                    <button id="clear-history-btn" class="w-full px-3 py-2 border rounded">Clear History</button>
+                    <button id="run-sample-btn" class="w-full px-3 py-2 border rounded">Run Sample Demo</button>
+                </div>
+                <div class="mt-6">
+                    <h4 class="font-medium">Gamified Challenges</h4>
+                    <div class="mt-2 text-sm text-gray-500">Score: <span id="challenge-score">0</span></div>
+                    <div id="badges-list" class="flex flex-wrap gap-2 mt-2">
+                        <span class="bg-gray-200 text-gray-800 text-xs font-semibold px-2.5 py-0.5 rounded-full dark:bg-gray-700 dark:text-gray-300">Welcome</span>
+                    </div>
+                    <div class="mt-3 flex gap-2">
+                        <button id="play-challenge-btn" class="flex-1 px-3 py-2 bg-emerald-500 text-white rounded">Play</button>
+                        <button class="flex-1 px-3 py-2 border rounded">Leaderboard</button>
+                    </div>
+                </div>
+            </aside>
+        </main>
+        
+        <section class="max-w-7xl mx-auto px-6 py-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="md:col-span-2 bg-white rounded-lg shadow p-4 dark:bg-gray-800">
+                    <h4 class="font-semibold">Dashboard</h4>
+                    <div class="mt-3 text-sm text-gray-500">History of analyses — saved locally (mock). Click Export to download JSON.</div>
+                    <div id="history-list" class="mt-4 space-y-2">
+                        <div class="text-xs text-gray-400">No history yet.</div>
+                    </div>
+                </div>
+                <aside class="bg-white rounded-lg shadow p-4 dark:bg-gray-800">
+                    <h4 class="font-semibold">Community</h4>
+                    <div class="mt-3 text-sm text-gray-500">Crowdsourced verification, trust circles, and commenting (UI placeholders).</div>
+                    <div class="mt-3 space-y-2">
+                        <button class="w-full px-3 py-2 border rounded">Open Trust Circle</button>
+                        <button class="w-full px-3 py-2 border rounded">Flagged reports</button>
+                    </div>
+                </aside>
+            </div>
+        </section>
+        
+        <footer class="mt-12 border-t bg-white dark:bg-gray-800 dark:border-gray-700">
+            <div class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-500">
+                <div>
+                    <div class="font-semibold">AuraScan</div>
+                    <div class="mt-2">We aim to restore trust and transparency in digital media. AuraScan combines explainable AI, community verification, and provenance tooling to help users make confident decisions about what they share and trust.</div>
+                </div>
+                <div>
+                    <div class="font-semibold">Legal & Trust</div>
+                    <ul class="mt-2 space-y-1">
+                        <li><a href="#">Privacy Policy</a></li>
+                        <li><a href="#">Terms</a></li>
+                        <li><a href="#">Contact</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="font-semibold">Design</div>
+                    <div class="mt-2">Modern gradients, glassmorphism, soft shadows, and clear iconography. © AuraScan 2025 | Built for digital trust</div>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <script>
+        // --- State Variables ---
+        let theme = "light";
+        let pasteUrl = "";
+        let filePreview = null;
+        let isAnalyzing = false;
+        let report = null;
+        let privacyMode = "local";
+        let history = [];
+        let challengeScore = 0;
+        let badges = ["Welcome"];
+        
+        // --- DOM Elements ---
+        const root = document.documentElement;
+        const themeToggleBtn = document.getElementById("theme-toggle");
+        const pasteUrlInput = document.getElementById("paste-url");
+        const pasteAnalyzeBtn = document.getElementById("paste-analyze-btn");
+        const fileInput = document.getElementById("file-input");
+        const uploadAnalyzeBtn = document.getElementById("upload-analyze-btn");
+        const generateHashBtn = document.getElementById("generate-hash-btn");
+        const filePreviewEl = document.getElementById("file-preview");
+        const previewImage = document.getElementById("preview-image");
+        const fileNameEl = document.getElementById("file-name");
+        const fileSizeEl = document.getElementById("file-size");
+        const supportedInfoEl = document.getElementById("supported-info");
+        const analyzeDropzone = document.getElementById("analyze");
+        const reportContentEl = document.getElementById("report-content");
+        const privacyModeSelect = document.getElementById("privacy-mode-select");
+        const privacyModeDisplay = document.getElementById("privacy-mode-display");
+        const exportHistoryBtn = document.getElementById("export-history-btn");
+        const clearHistoryBtn = document.getElementById("clear-history-btn");
+        const runSampleBtn = document.getElementById("run-sample-btn");
+        const playChallengeBtn = document.getElementById("play-challenge-btn");
+        const challengeScoreEl = document.getElementById("challenge-score");
+        const badgesListEl = document.getElementById("badges-list");
+        const historyListEl = document.getElementById("history-list");
+
+        // Modal elements
+        const modalContainer = document.getElementById("modal-container");
+        const modalTitleEl = document.getElementById("modal-title");
+        const modalMessageEl = document.getElementById("modal-message");
+        const modalInput = document.getElementById("modal-input");
+        const modalConfirmBtn = document.getElementById("modal-confirm");
+        const modalCloseBtn = document.getElementById("modal-close");
+
+        // --- Functions for UI Updates ---
+        function updateBadges() {
+            if (challengeScore >= 10 && !badges.includes("Challenger")) {
+                badges.push("Challenger");
+            }
+            if (challengeScore >= 50 && !badges.includes("Expert Analyst")) {
+                badges.push("Expert Analyst");
+            }
+            if (challengeScore >= 100 && !badges.includes("Master Verifier")) {
+                badges.push("Master Verifier");
+            }
+            if (history.length >= 20 && !badges.includes("History Buff")) {
+                badges.push("History Buff");
+            }
+        }
+        
+        function updateUI() {
+            // Update theme
+            root.classList.toggle("dark", theme === "dark");
+
+            // Update file preview section
+            if (filePreview) {
+                filePreviewEl.classList.remove("hidden");
+                supportedInfoEl.classList.add("hidden");
+                previewImage.src = filePreview.url;
+                fileNameEl.textContent = filePreview.name;
+                fileSizeEl.textContent = filePreview.size ? `${Math.round(filePreview.size / 1024)} KB` : "URL / Audio";
+            } else {
+                filePreviewEl.classList.add("hidden");
+                supportedInfoEl.classList.remove("hidden");
+            }
+
+            // Update report section
+            if (isAnalyzing) {
+                reportContentEl.innerHTML = '<div class="mt-6">Analyzing... <span class="animate-pulse">⏳</span></div>';
+            } else if (report) {
+                reportContentEl.innerHTML = `
+                    <div class="mt-4 space-y-4">
+                        <div class="flex items-center gap-4">
+                            <div class="rounded-full w-20 h-20 flex items-center justify-center text-white text-xl font-bold ${report.confidence > 75 ? "bg-red-500" : report.confidence > 60 ? "bg-orange-400" : "bg-emerald-500"}">
+                                ${report.confidence}%
+                            </div>
+                            <div>
+                                <div class="text-xl font-bold">${report.verdict}</div>
+                                <div class="text-sm text-gray-500">Confidence score from detection ensemble</div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-md p-3">
+                            <h4 class="font-medium">Why we flagged this</h4>
+                            <ul class="mt-2 list-disc ml-5 text-sm text-gray-700 dark:text-gray-300">
+                                ${report.reasons.map((r) => `<li>${r}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <h5 class="font-medium">Interactive Heatmap</h5>
+                                <canvas id="heatmap-canvas" width="400" height="300" class="rounded border dark:border-gray-600 bg-gray-200 dark:bg-gray-700"></canvas>
+                            </div>
+                            <div>
+                                <h5 class="font-medium">Anomaly Timeline</h5>
+                                <div id="timeline-container"></div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center justify-between">
+                            <div class="text-sm text-gray-600">Community: ${report.community.flags} flags • ${report.community.verified} verified</div>
+                            <div class="flex gap-2">
+                                <button class="px-3 py-2 border rounded">Flag</button>
+                                <button id="open-report-btn" class="px-3 py-2 bg-indigo-600 text-white rounded">Open Full Report</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                renderHeatmap();
+                renderTimeline();
+            } else {
+                reportContentEl.innerHTML = '<div class="mt-6 text-gray-500">No analysis yet — upload or paste URL and click Analyze.</div>';
+            }
+
+            // Update privacy mode display
+            privacyModeDisplay.textContent = privacyMode;
+
+            // Update history list
+            historyListEl.innerHTML = '';
+            if (history.length === 0) {
+                historyListEl.innerHTML = '<div class="text-xs text-gray-400">No history yet.</div>';
+            } else {
+                history.forEach((h) => {
+                    const div = document.createElement('div');
+                    div.className = "border rounded p-2 text-sm dark:border-gray-700 flex items-start justify-between";
+                    div.innerHTML = `
+                        <div>
+                            <div class="font-medium">${h.file?.name || h.id}</div>
+                            <div class="text-xs text-gray-500">${h.verdict || h.type || "entry"} • ${new Date(parseInt(h.id, 36)).toLocaleString()}</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="px-2 py-1 border rounded text-xs">View</button>
+                            <button class="px-2 py-1 border rounded text-xs">Share</button>
+                        </div>
+                    `;
+                    historyListEl.appendChild(div);
+                });
+            }
+
+            // Update gamified challenge
+            challengeScoreEl.textContent = challengeScore;
+            badgesListEl.innerHTML = '';
+            badges.forEach(badge => {
+                const span = document.createElement('span');
+                span.className = "bg-gray-200 text-gray-800 text-xs font-semibold px-2.5 py-0.5 rounded-full dark:bg-gray-700 dark:text-gray-300";
+                span.textContent = badge;
+                badgesListEl.appendChild(span);
+            });
+            
+            // Re-attach event listeners for dynamic content
+            if (report) {
+                document.getElementById('open-report-btn').addEventListener('click', openFullReport);
+            }
+        }
+
+        function showModal({ title, message, showInput = false, inputPlaceholder = '', inputValue = '', onConfirm = null }) {
+            modalTitleEl.textContent = title;
+            modalMessageEl.textContent = message;
+            modalInput.classList.toggle('hidden', !showInput);
+            modalInput.placeholder = inputPlaceholder;
+            modalInput.value = inputValue;
+            modalConfirmBtn.classList.toggle('hidden', !onConfirm);
+            modalContainer.classList.remove('hidden');
+
+            const handleConfirm = () => {
+                if (onConfirm) onConfirm();
+                hideModal();
+            };
+
+            const handleClose = () => {
+                hideModal();
+            };
+
+            modalConfirmBtn.onclick = handleConfirm;
+            modalCloseBtn.onclick = handleClose;
+        }
+
+        function hideModal() {
+            modalContainer.classList.add('hidden');
+            modalConfirmBtn.onclick = null;
+            modalCloseBtn.onclick = null;
+        }
+        
+        function renderHeatmap() {
+            const canvas = document.getElementById("heatmap-canvas");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (report.file.url) {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.src = report.file.url;
+                img.onload = () => {
+                    ctx.globalAlpha = 0.3;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    ctx.globalAlpha = 1.0;
+                    drawRegions();
+                };
+                img.onerror = () => {
+                    drawRegions();
+                };
+            } else {
+                drawRegions();
+            }
+
+            function drawRegions() {
+                report.heatmapRegions.forEach((r, i) => {
+                    ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(r.x, r.y, r.w, r.h);
+                    ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
+                    ctx.fillRect(r.x, r.y, r.w, r.h);
+                    ctx.fillStyle = "rgba(255,0,0,1)";
+                    ctx.font = "12px sans-serif";
+                    ctx.fillText(r.label || `Region ${i + 1}`, r.x + 4, r.y + 14);
+                });
+            }
+        }
+        
+        function renderTimeline() {
+            const timelineContainer = document.getElementById("timeline-container");
+            if (!timelineContainer) return;
+
+            if (report.duration === 0) {
+                timelineContainer.innerHTML = '<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">No timeline for static images.</div>';
+                return;
+            }
+
+            const anomalyBars = report.anomalies.map((a, i) => {
+                const leftPct = Math.min(100, Math.max(0, (a.time / report.duration) * 100));
+                return `
+                    <div
+                        class="absolute top-0 bottom-0 bg-red-500 opacity-70"
+                        style="left: ${leftPct}%; width: 2%;"
+                        title="${a.label} (${a.time}s)"
+                    ></div>
+                `;
+            }).join('');
+
+            timelineContainer.innerHTML = `
+                <div class="w-full mt-2">
+                    <div class="relative h-8 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
+                        ${anomalyBars}
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Anomaly timeline over ${report.duration}s</div>
+                </div>
+            `;
+        }
+        
+        function openFullReport() {
+            if (!report) return;
+            const provenanceList = report.provenance.map(p => `<li>URL: <a href="${p.url}" class="text-indigo-500">${p.url}</a> (Score: ${p.score})</li>`).join('');
+            const message = `
+                File: ${report.file.name}
+                Source: ${report.source}
+                Verdict: ${report.verdict}
+                Confidence: ${report.confidence}%
+                ---
+                Reasons:
+                ${report.reasons.map(r => `• ${r}`).join('\n')}
+                ---
+                Provenance:
+                ${provenanceList || 'No data found.'}
+                ---
+                Community Flags: ${report.community.flags}
+                Community Verified: ${report.community.verified}
+            `;
+            showModal({ title: 'Full Report Details', message: message });
+        }
+
+        // --- Event Handlers ---
+        themeToggleBtn.addEventListener("click", () => {
+            theme = theme === "dark" ? "light" : "dark";
+            updateUI();
+        });
+
+        pasteUrlInput.addEventListener("input", (e) => {
+            pasteUrl = e.target.value;
+        });
+
+        pasteAnalyzeBtn.addEventListener("click", () => {
+            if (!pasteUrl.trim()) {
+                showModal({
+                    title: 'Error',
+                    message: 'Please enter a URL first.',
+                    onClose: hideModal
+                });
+                return;
+            }
+            filePreview = { url: pasteUrl, name: pasteUrl, size: 0, type: "" };
+            runMockAnalysis("url");
+        });
+
+        fileInput.addEventListener("change", (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            const url = URL.createObjectURL(f);
+            filePreview = { url, name: f.name, size: f.size, type: f.type };
+            report = null;
+            updateUI();
+        });
+
+        analyzeDropzone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const f = e.dataTransfer?.files?.[0];
+            if (!f) return;
+            const url = URL.createObjectURL(f);
+            filePreview = { url, name: f.name, size: f.size, type: f.type };
+            report = null;
+            updateUI();
+        });
+
+        analyzeDropzone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+        });
+
+        uploadAnalyzeBtn.addEventListener("click", () => {
+            if (!filePreview) {
+                showModal({
+                    title: 'Error',
+                    message: 'Please upload a file first.',
+                    onClose: hideModal
+                });
+                return;
+            }
+            runMockAnalysis("upload");
+        });
+
+        generateHashBtn.addEventListener("click", () => {
+            const payload = (filePreview?.name || pasteUrl || "anon") + Date.now();
+            const hash = btoa(unescape(encodeURIComponent(payload))).slice(0, 32);
+            const h = `AS-HASH-${hash}`;
+            const entry = { type: "watermark", id: Date.now().toString(36), hash: h, date: new Date().toISOString() };
+            history = [entry, ...history].slice(0, 50);
+            updateBadges();
+            updateUI();
+            showModal({
+                title: 'Watermark Generated',
+                message: `Generated authenticity hash:\n${h}`,
+                onClose: hideModal
+            });
+        });
+
+        exportHistoryBtn.addEventListener("click", () => {
+            const blob = new Blob([JSON.stringify(history, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "aurascan-history.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        clearHistoryBtn.addEventListener("click", () => {
+            history = [];
+            updateBadges();
+            updateUI();
+        });
+
+        runSampleBtn.addEventListener("click", () => {
+            filePreview = { url: "https://placehold.co/400x300/e2e8f0/64748b?text=Sample+Image", name: "error.jpg", size: 0, type: "" };
+            runMockAnalysis("sample");
+        });
+
+        playChallengeBtn.addEventListener("click", () => {
+            if (!report) {
+                showModal({
+                    title: 'Challenge Unavailable',
+                    message: 'Please analyze media first to start the challenge.',
+                    onClose: hideModal
+                });
+                return;
+            }
+            showModal({
+                title: 'Spot-the-Fake Challenge',
+                message: 'What is the verdict for the report? (e.g., Likely AI-Generated)',
+                showInput: true,
+                inputPlaceholder: 'Enter your guess here...',
+                onConfirm: () => {
+                    const userChoice = modalInput.value.trim().toLowerCase();
+                    if (userChoice === report.verdict.trim().toLowerCase()) {
+                        challengeScore += 10;
+                        updateBadges();
+                        updateUI();
+                        showModal({
+                            title: 'Correct!',
+                            message: 'You guessed correctly! +10 points.',
+                            onClose: hideModal
+                        });
+                    } else {
+                        showModal({
+                            title: 'Incorrect',
+                            message: `Wrong. The correct verdict is: ${report.verdict}`,
+                            onClose: hideModal
+                        });
+                    }
+                }
+            });
+        });
+
+        privacyModeSelect.addEventListener("change", (e) => {
+            privacyMode = e.target.value;
+            updateUI();
+        });
+
+        // --- Mock Analysis Logic ---
+        function runMockAnalysis(source = "upload") {
+            if (source === "upload" && !filePreview) {
+                showModal({
+                    title: 'Error',
+                    message: 'Please upload a file first.',
+                    onClose: hideModal
+                });
+                return;
+            }
+            isAnalyzing = true;
+            report = null;
+            updateUI();
+        
+            setTimeout(() => {
+                const isSpecificAiImage = filePreview?.name === 'error.jpg';
+                let analysisReport;
+        
+                if (isSpecificAiImage) {
+                    analysisReport = {
+                        id: Date.now().toString(36),
+                        source,
+                        file: filePreview || { url: pasteUrl || "", name: pasteUrl || "Pasted URL", size: 0 },
+                        confidence: 96,
+                        verdict: "Likely AI-Generated",
+                        reasons: [
+                            "Anomalous finger and hand structure (common AI artifact).",
+                            "Inconsistent object geometry (warped cup).",
+                            "Unnatural blending and texture on clothing.",
+                            "Distorted light reflections in the background.",
+                            "Illogical object interaction (hand/utensil grip)."
+                        ],
+                        heatmapRegions: [
+                            { x: 85, y: 15, w: 55, h: 45, label: "1: Distorted Light" },
+                            { x: 105, y: 180, w: 70, h: 60, label: "2: Sleeve Anomaly" },
+                            { x: 165, y: 240, w: 70, h: 55, label: "3: Warped Cup" },
+                            { x: 235, y: 245, w: 50, h: 40, label: "4: Finger Anomaly" },
+                            { x: 280, y: 220, w: 90, h: 70, label: "5: Malformed Hand" }
+                        ],
+                        anomalies: [],
+                        provenance: [],
+                        community: { flags: 12, verified: 3 },
+                        privacyMode,
+                        duration: 0
+                    };
+                } else {
+                    const conf = Math.floor(55 + Math.random() * 40);
+                    let verdict;
+                    if (conf > 75) verdict = "Likely Manipulated";
+                    else if (conf > 60) verdict = "Needs Review";
+                    else verdict = "Likely Authentic";
+        
+                    analysisReport = {
+                        id: Date.now().toString(36),
+                        source,
+                        file: filePreview || { url: pasteUrl || "", name: pasteUrl || "Pasted URL", size: 0 },
+                        confidence: conf,
+                        verdict,
+                        reasons: [
+                            "Inconsistent lighting on face region",
+                            "Noise / texture mismatch at edges"
+                        ],
+                        heatmapRegions: [
+                            { x: 30, y: 40, w: 120, h: 140, label: "Face region" },
+                            { x: 300, y: 80, w: 90, h: 70, label: "Background patch" }
+                        ],
+                        anomalies: [
+                            { time: 12, label: "Temporal distortion" },
+                            { time: 28, label: "Audio sync issue" }
+                        ],
+                        provenance: [
+                            { url: "https://example.com/original1.jpg", score: 0.82, date: "2025-09-19" }
+                        ],
+                        community: { flags: Math.floor(Math.random() * 20), verified: Math.floor(Math.random() * 5) },
+                        privacyMode,
+                        duration: 60
+                    };
+                }
+        
+                report = analysisReport;
+                history = [analysisReport, ...history].slice(0, 50);
+                isAnalyzing = false;
+                updateBadges();
+                updateUI();
+            }, 1500);
+        }
+
+        // Initial UI render
+        document.addEventListener("DOMContentLoaded", () => {
+            updateUI();
+        });
+    </script>
+</body>
+</html>
