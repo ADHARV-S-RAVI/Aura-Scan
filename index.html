@@ -796,7 +796,7 @@
                 }
 
                 const prompt = `Analyze this image for signs of AI generation or manipulation. Respond with a JSON object. If you detect AI artifacts or manipulation, provide a "verdict" like 'Likely AI-Generated' or 'Likely Manipulated', a "confidence" score (0-100), and an array of "reasons" for your conclusion. If the image appears authentic, the "verdict" should be 'Likely Authentic' and the "confidence" should be low (e.g., < 40). Ensure the JSON object is properly formatted and includes the following keys: "verdict", "confidence", "reasons" (array of strings), "flaggedReason" (empty string), "provenance" (empty array), "community" (object with flags: 0, verified: 0), "duration" (0), and "anomalies" (empty array). The confidence score should be an integer.`;
-                const apiKey = "YOUR_API_KEY_HERE";
+                const apiKey = "AIzaSyDzA9U0JF5E5NMjmLbeEG4YSZN6rmjtP7Y";
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
                 const payload = {
@@ -810,51 +810,7 @@
                                 }
                             }
                         ]
-                    }],
-                    generationConfig: {
-                      responseMimeType: "application/json",
-                      responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                          verdict: { type: "STRING" },
-                          confidence: { type: "INTEGER" },
-                          reasons: {
-                            type: "ARRAY",
-                            items: { type: "STRING" }
-                          },
-                          flaggedReason: { type: "STRING" },
-                          provenance: {
-                            type: "ARRAY",
-                            items: {
-                              type: "OBJECT",
-                              properties: {
-                                url: { type: "STRING" },
-                                score: { type: "NUMBER" },
-                                date: { type: "STRING" }
-                              }
-                            }
-                          },
-                          community: {
-                            type: "OBJECT",
-                            properties: {
-                              flags: { type: "INTEGER" },
-                              verified: { type: "INTEGER" }
-                            }
-                          },
-                          duration: { type: "INTEGER" },
-                          anomalies: {
-                            type: "ARRAY",
-                            items: {
-                              type: "OBJECT",
-                              properties: {
-                                time: { type: "INTEGER" },
-                                label: { type: "STRING" }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
+                    }]
                 };
                 
                 const controller = new AbortController();
