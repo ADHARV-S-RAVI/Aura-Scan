@@ -117,7 +117,12 @@
                     </div>
                     <div class="mt-3 flex gap-2">
                         <button id="play-challenge-btn" class="flex-1 px-3 py-2 bg-emerald-500 text-white rounded">Play</button>
-                        <button id="leaderboard-btn" class="flex-1 px-3 py-2 border rounded">Leaderboard</button>
+                    </div>
+                </div>
+                <div id="leaderboard-section">
+                    <h4 class="font-medium mt-6">Leaderboard</h4>
+                    <div id="leaderboard-list" class="mt-2 text-sm space-y-2">
+                        <!-- Leaderboard items will be rendered here -->
                     </div>
                 </div>
             </aside>
@@ -140,6 +145,16 @@
                         <button class="w-full px-3 py-2 border rounded">Flagged reports</button>
                     </div>
                 </aside>
+            </div>
+        </section>
+
+        <section id="review-session" class="max-w-7xl mx-auto px-6 py-6">
+            <div class="bg-white rounded-lg shadow p-4 dark:bg-gray-800">
+                <h4 class="font-semibold">Review Session</h4>
+                <div class="mt-3 text-sm text-gray-500">Reports flagged by the community for manual review.</div>
+                <div id="flagged-reports-list" class="mt-4 space-y-2">
+                    <div class="text-xs text-gray-400">No flagged reports yet.</div>
+                </div>
             </div>
         </section>
         
@@ -182,7 +197,7 @@
             { name: "Alex Chen", score: 75 },
             { name: "Your Score", score: 0 },
             { name: "Chris Green", score: 50 },
-        ].sort((a, b) => b.score - a.score);
+        ];
         
         // --- DOM Elements ---
         const root = document.documentElement;
@@ -208,7 +223,7 @@
         const challengeScoreEl = document.getElementById("challenge-score");
         const badgesListEl = document.getElementById("badges-list");
         const historyListEl = document.getElementById("history-list");
-        const leaderboardBtn = document.getElementById("leaderboard-btn");
+        const flaggedReportsListEl = document.getElementById("flagged-reports-list");
 
         // Modal elements
         const modalContainer = document.getElementById("modal-container");
@@ -234,6 +249,47 @@
             }
         }
         
+        function updateLeaderboard() {
+            const yourScoreIndex = leaderboard.findIndex(user => user.name === 'Your Score');
+            if (yourScoreIndex !== -1) {
+                leaderboard[yourScoreIndex].score = challengeScore;
+            }
+            leaderboard.sort((a, b) => b.score - a.score);
+
+            const leaderboardListEl = document.getElementById("leaderboard-list");
+            leaderboardListEl.innerHTML = `
+                ${leaderboard.map((user, index) => `
+                    <div class="flex justify-between items-center p-2 rounded-md ${user.name === 'Your Score' ? 'bg-indigo-100 dark:bg-indigo-900 font-bold' : 'bg-gray-100 dark:bg-gray-700'}">
+                        <span>${index + 1}. ${user.name}</span>
+                        <span>${user.score}</span>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function renderReviewSession() {
+            const flaggedReports = history.filter(report => report.community?.flags > 0);
+            flaggedReportsListEl.innerHTML = '';
+            if (flaggedReports.length === 0) {
+                flaggedReportsListEl.innerHTML = '<div class="text-xs text-gray-400">No flagged reports yet.</div>';
+            } else {
+                flaggedReports.forEach((h) => {
+                    const div = document.createElement('div');
+                    div.className = "border rounded p-2 text-sm dark:border-gray-700 flex items-start justify-between";
+                    div.innerHTML = `
+                        <div>
+                            <div class="font-medium">Flagged: ${h.file?.name || h.id}</div>
+                            <div class="text-xs text-gray-500">Verdict: ${h.verdict || "N/A"} • Flags: ${h.community.flags}</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="px-2 py-1 border rounded text-xs">Review</button>
+                        </div>
+                    `;
+                    flaggedReportsListEl.appendChild(div);
+                });
+            }
+        }
+
         function updateUI() {
             // Update theme
             root.classList.toggle("dark", theme === "dark");
@@ -282,9 +338,9 @@
                             </div>
                         </div>
                         <div class="mt-4 flex items-center justify-between">
-                            <div class="text-sm text-gray-600">Community: ${report.community.flags} flags • ${report.community.verified} verified</div>
+                            <div class="text-sm text-gray-600">Community: <span id="report-flags">${report.community.flags}</span> flags • ${report.community.verified} verified</div>
                             <div class="flex gap-2">
-                                <button class="px-3 py-2 border rounded">Flag</button>
+                                <button id="flag-btn" class="px-3 py-2 border rounded">Flag</button>
                                 <button id="open-report-btn" class="px-3 py-2 bg-indigo-600 text-white rounded">Open Full Report</button>
                             </div>
                         </div>
@@ -334,7 +390,11 @@
             // Re-attach event listeners for dynamic content
             if (report) {
                 document.getElementById('open-report-btn').addEventListener('click', openFullReport);
+                document.getElementById('flag-btn').addEventListener('click', flagReport);
             }
+
+            updateLeaderboard();
+            renderReviewSession();
         }
 
         function showModal({ title, message, showInput = false, inputPlaceholder = '', inputValue = '', onConfirm = null }) {
@@ -453,29 +513,22 @@
             showModal({ title: 'Full Report Details', message: message });
         }
         
-        function updateLeaderboardUI() {
-            const leaderboardHtml = `
-                <div class="mt-6">
-                    <h4 class="font-medium">Leaderboard</h4>
-                    <div class="mt-2 text-sm space-y-2">
-                        ${leaderboard.map((user, index) => `
-                            <div class="flex justify-between items-center p-2 rounded-md ${user.name === 'Your Score' ? 'bg-indigo-100 dark:bg-indigo-900 font-bold' : 'bg-gray-100 dark:bg-gray-700'}">
-                                <span>${index + 1}. ${user.name}</span>
-                                <span>${user.score}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-            const parent = leaderboardBtn.parentElement.parentElement;
-            const existingLeaderboard = parent.querySelector('.leaderboard-container');
-            if(existingLeaderboard) {
-                existingLeaderboard.remove();
+        function flagReport() {
+            if (report) {
+                report.community.flags += 1;
+                const reportFlagsEl = document.getElementById("report-flags");
+                if (reportFlagsEl) {
+                    reportFlagsEl.textContent = report.community.flags;
+                }
+
+                // Update history with the flagged report
+                const historyIndex = history.findIndex(h => h.id === report.id);
+                if (historyIndex !== -1) {
+                    history[historyIndex] = { ...report };
+                }
+                
+                renderReviewSession();
             }
-            const div = document.createElement('div');
-            div.className = 'leaderboard-container';
-            div.innerHTML = leaderboardHtml;
-            parent.appendChild(div);
         }
 
         // --- Event Handlers ---
@@ -611,11 +664,6 @@
 
                     if (isCorrect) {
                         challengeScore += 10;
-                        const yourScoreIndex = leaderboard.findIndex(user => user.name === 'Your Score');
-                        if (yourScoreIndex !== -1) {
-                            leaderboard[yourScoreIndex].score = challengeScore;
-                        }
-                        leaderboard.sort((a, b) => b.score - a.score);
                         updateBadges();
                         updateUI();
                         showModal({
@@ -631,15 +679,6 @@
                         });
                     }
                 }
-            });
-        });
-        
-        leaderboardBtn.addEventListener("click", () => {
-            updateLeaderboardUI();
-            showModal({
-                title: 'Leaderboard',
-                message: leaderboard.map((user, index) => `${index + 1}. ${user.name}: ${user.score}`).join('\n'),
-                onClose: hideModal
             });
         });
 
