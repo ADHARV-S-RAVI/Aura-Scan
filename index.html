@@ -10,9 +10,12 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+        .dark .bg-gradient-light {
+            background-image: none;
+        }
     </style>
 </head>
-<body class="min-h-screen bg-gradient-to-b from-gray-50 to-white text-gray-900 dark:from-gray-900 dark:to-gray-800 dark:text-gray-100">
+<body class="min-h-screen bg-gradient-to-b text-gray-900 bg-gray-50 from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 dark:text-gray-100">
 
     <!-- Modal Markup -->
     <div id="modal-container" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
@@ -114,7 +117,7 @@
                     </div>
                     <div class="mt-3 flex gap-2">
                         <button id="play-challenge-btn" class="flex-1 px-3 py-2 bg-emerald-500 text-white rounded">Play</button>
-                        <button class="flex-1 px-3 py-2 border rounded">Leaderboard</button>
+                        <button id="leaderboard-btn" class="flex-1 px-3 py-2 border rounded">Leaderboard</button>
                     </div>
                 </div>
             </aside>
@@ -173,6 +176,13 @@
         let history = [];
         let challengeScore = 0;
         let badges = ["Welcome"];
+        let leaderboard = [
+            { name: "John Doe", score: 120 },
+            { name: "Jane Smith", score: 90 },
+            { name: "Alex Chen", score: 75 },
+            { name: "Your Score", score: 0 },
+            { name: "Chris Green", score: 50 },
+        ].sort((a, b) => b.score - a.score);
         
         // --- DOM Elements ---
         const root = document.documentElement;
@@ -198,6 +208,7 @@
         const challengeScoreEl = document.getElementById("challenge-score");
         const badgesListEl = document.getElementById("badges-list");
         const historyListEl = document.getElementById("history-list");
+        const leaderboardBtn = document.getElementById("leaderboard-btn");
 
         // Modal elements
         const modalContainer = document.getElementById("modal-container");
@@ -441,6 +452,31 @@
             `;
             showModal({ title: 'Full Report Details', message: message });
         }
+        
+        function updateLeaderboardUI() {
+            const leaderboardHtml = `
+                <div class="mt-6">
+                    <h4 class="font-medium">Leaderboard</h4>
+                    <div class="mt-2 text-sm space-y-2">
+                        ${leaderboard.map((user, index) => `
+                            <div class="flex justify-between items-center p-2 rounded-md ${user.name === 'Your Score' ? 'bg-indigo-100 dark:bg-indigo-900 font-bold' : 'bg-gray-100 dark:bg-gray-700'}">
+                                <span>${index + 1}. ${user.name}</span>
+                                <span>${user.score}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            const parent = leaderboardBtn.parentElement.parentElement;
+            const existingLeaderboard = parent.querySelector('.leaderboard-container');
+            if(existingLeaderboard) {
+                existingLeaderboard.remove();
+            }
+            const div = document.createElement('div');
+            div.className = 'leaderboard-container';
+            div.innerHTML = leaderboardHtml;
+            parent.appendChild(div);
+        }
 
         // --- Event Handlers ---
         themeToggleBtn.addEventListener("click", () => {
@@ -545,15 +581,41 @@
                 });
                 return;
             }
+            
+            let question;
+            let answer;
+            
+            if (report.verdict.toLowerCase().includes('ai-generated')) {
+                const randomReason = report.reasons[Math.floor(Math.random() * report.reasons.length)];
+                question = `The report flagged an AI artifact. Can you name one reason mentioned in the report?`;
+                answer = randomReason.toLowerCase();
+            } else if (report.verdict.toLowerCase().includes('manipulated')) {
+                question = `The report is "Likely Manipulated". What is the confidence score range?`;
+                answer = "75-99";
+            } else if (report.verdict.toLowerCase().includes('authentic')) {
+                question = `The report is "Likely Authentic". Is any provenance data available for this file? Answer "yes" or "no".`;
+                answer = report.provenance.length > 0 ? "yes" : "no";
+            } else { // Needs review
+                question = `The report needs review. What is the confidence score range?`;
+                answer = "60-75";
+            }
+
             showModal({
                 title: 'Spot-the-Fake Challenge',
-                message: 'What is the verdict for the report? (e.g., Likely AI-Generated)',
+                message: question,
                 showInput: true,
                 inputPlaceholder: 'Enter your guess here...',
                 onConfirm: () => {
                     const userChoice = modalInput.value.trim().toLowerCase();
-                    if (userChoice === report.verdict.trim().toLowerCase()) {
+                    let isCorrect = userChoice === answer;
+
+                    if (isCorrect) {
                         challengeScore += 10;
+                        const yourScoreIndex = leaderboard.findIndex(user => user.name === 'Your Score');
+                        if (yourScoreIndex !== -1) {
+                            leaderboard[yourScoreIndex].score = challengeScore;
+                        }
+                        leaderboard.sort((a, b) => b.score - a.score);
                         updateBadges();
                         updateUI();
                         showModal({
@@ -564,11 +626,20 @@
                     } else {
                         showModal({
                             title: 'Incorrect',
-                            message: `Wrong. The correct verdict is: ${report.verdict}`,
+                            message: `Wrong. The correct answer is: ${answer}`,
                             onClose: hideModal
                         });
                     }
                 }
+            });
+        });
+        
+        leaderboardBtn.addEventListener("click", () => {
+            updateLeaderboardUI();
+            showModal({
+                title: 'Leaderboard',
+                message: leaderboard.map((user, index) => `${index + 1}. ${user.name}: ${user.score}`).join('\n'),
+                onClose: hideModal
             });
         });
 
