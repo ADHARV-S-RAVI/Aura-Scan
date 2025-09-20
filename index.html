@@ -280,6 +280,7 @@
                         <div>
                             <div class="font-medium">Flagged: ${h.file?.name || h.id}</div>
                             <div class="text-xs text-gray-500">Verdict: ${h.verdict || "N/A"} • Flags: ${h.community.flags}</div>
+                            <div class="text-xs text-gray-500 italic mt-1">Reason: ${h.flaggedReason || 'N/A'}</div>
                         </div>
                         <div class="flex gap-2">
                             <button class="px-2 py-1 border rounded text-xs">Review</button>
@@ -308,7 +309,7 @@
 
             // Update report section
             if (isAnalyzing) {
-                reportContentEl.innerHTML = '<div class="mt-6">Analyzing... <span class="animate-pulse">⏳</span></div>';
+                reportContentEl.innerHTML = '<div class="mt-6 flex flex-col items-center"><div>Analyzing... <span class="animate-pulse">⏳</span></div><div id="progress-bar-container" class="mt-2 w-full max-w-sm h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden"><div id="progress-bar" class="h-full bg-indigo-500 transition-all duration-300 ease-linear"></div></div></div>';
             } else if (report) {
                 reportContentEl.innerHTML = `
                     <div class="mt-4 space-y-4">
@@ -449,7 +450,8 @@
             }
 
             function drawRegions() {
-                report.heatmapRegions.forEach((r, i) => {
+                // Ensure heatmapRegions exists and is an array before calling forEach
+                (report.heatmapRegions || []).forEach((r, i) => {
                     ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
                     ctx.lineWidth = 2;
                     ctx.strokeRect(r.x, r.y, r.w, r.h);
@@ -514,21 +516,43 @@
         }
         
         function flagReport() {
-            if (report) {
-                report.community.flags += 1;
-                const reportFlagsEl = document.getElementById("report-flags");
-                if (reportFlagsEl) {
-                    reportFlagsEl.textContent = report.community.flags;
-                }
+            if (!report) return;
 
-                // Update history with the flagged report
-                const historyIndex = history.findIndex(h => h.id === report.id);
-                if (historyIndex !== -1) {
-                    history[historyIndex] = { ...report };
+            showModal({
+                title: 'Why are you flagging this?',
+                message: 'Please provide a brief reason for flagging this content.',
+                showInput: true,
+                inputPlaceholder: 'e.g., "Malformed hand artifact."',
+                onConfirm: () => {
+                    const reason = modalInput.value.trim();
+                    if (reason) {
+                        report.community.flags += 1;
+                        report.flaggedReason = reason;
+                        
+                        // Update history with the flagged report
+                        const historyIndex = history.findIndex(h => h.id === report.id);
+                        if (historyIndex !== -1) {
+                            history[historyIndex] = { ...report };
+                        } else {
+                            // This case handles when an item is flagged without a prior analysis being in history.
+                            history = [report, ...history].slice(0, 50);
+                        }
+
+                        updateUI();
+                        showModal({
+                            title: 'Flagged Successfully',
+                            message: `Thank you for your feedback! This report has been flagged with the reason:\n\n"${reason}"`,
+                            onClose: hideModal
+                        });
+                    } else {
+                        showModal({
+                            title: 'Flagging Canceled',
+                            message: 'No reason was provided. The report was not flagged.',
+                            onClose: hideModal
+                        });
+                    }
                 }
-                
-                renderReviewSession();
-            }
+            });
         }
 
         // --- Event Handlers ---
@@ -551,7 +575,7 @@
                 return;
             }
             filePreview = { url: pasteUrl, name: pasteUrl, size: 0, type: "" };
-            runMockAnalysis("url");
+            runAnalysis("url");
         });
 
         fileInput.addEventListener("change", (e) => {
@@ -586,7 +610,7 @@
                 });
                 return;
             }
-            runMockAnalysis("upload");
+            runAnalysis("upload");
         });
 
         generateHashBtn.addEventListener("click", () => {
@@ -622,7 +646,7 @@
 
         runSampleBtn.addEventListener("click", () => {
             filePreview = { url: "https://placehold.co/400x300/e2e8f0/64748b?text=Sample+Image", name: "error.jpg", size: 0, type: "" };
-            runMockAnalysis("sample");
+            runAnalysis("sample");
         });
 
         playChallengeBtn.addEventListener("click", () => {
@@ -647,7 +671,7 @@
                 answer = "75-99";
             } else if (report.verdict.toLowerCase().includes('authentic')) {
                 question = `The report is "Likely Authentic". Is any provenance data available for this file? Answer "yes" or "no".`;
-                answer = report.provenance.length > 0 ? "yes" : "no";
+                answer = report.provenance?.length > 0 ? "yes" : "no";
             } else { // Needs review
                 question = `The report needs review. What is the confidence score range?`;
                 answer = "60-75";
@@ -687,8 +711,8 @@
             updateUI();
         });
 
-        // --- Mock Analysis Logic ---
-        function runMockAnalysis(source = "upload") {
+        // --- Real Analysis Function (Replaces mock) ---
+        async function runAnalysis(source = "upload") {
             if (source === "upload" && !filePreview) {
                 showModal({
                     title: 'Error',
@@ -697,16 +721,25 @@
                 });
                 return;
             }
+
             isAnalyzing = true;
             report = null;
             updateUI();
+            
+            let progress = 0;
+            const progressBar = document.getElementById("progress-bar");
+            const interval = setInterval(() => {
+                progress = Math.min(95, progress + 5);
+                if (progressBar) {
+                  progressBar.style.width = `${progress}%`;
+                }
+            }, 500);
         
-            setTimeout(() => {
-                const isSpecificAiImage = filePreview?.name === 'error.jpg';
-                let analysisReport;
-        
-                if (isSpecificAiImage) {
-                    analysisReport = {
+            // Special case for demo image
+            if (filePreview?.name === 'error.jpg') {
+                setTimeout(() => {
+                    clearInterval(interval);
+                    report = {
                         id: Date.now().toString(36),
                         source,
                         file: filePreview || { url: pasteUrl || "", name: pasteUrl || "Pasted URL", size: 0 },
@@ -732,46 +765,173 @@
                         privacyMode,
                         duration: 0
                     };
+                    history = [report, ...history].slice(0, 50);
+                    isAnalyzing = false;
+                    updateBadges();
+                    updateUI();
+                }, 1500);
+                return;
+            }
+
+            // Real API call for other images
+            try {
+                let base64Data;
+                if (filePreview && filePreview.url.startsWith('blob:')) {
+                    base64Data = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            resolve(reader.result.split(',')[1]);
+                        };
+                        reader.onerror = reject;
+                        fetch(filePreview.url).then(res => res.blob()).then(blob => reader.readAsDataURL(blob));
+                    });
                 } else {
-                    const conf = Math.floor(55 + Math.random() * 40);
-                    let verdict;
-                    if (conf > 75) verdict = "Likely Manipulated";
-                    else if (conf > 60) verdict = "Needs Review";
-                    else verdict = "Likely Authentic";
-        
-                    analysisReport = {
-                        id: Date.now().toString(36),
-                        source,
-                        file: filePreview || { url: pasteUrl || "", name: pasteUrl || "Pasted URL", size: 0 },
-                        confidence: conf,
-                        verdict,
-                        reasons: [
-                            "Inconsistent lighting on face region",
-                            "Noise / texture mismatch at edges"
-                        ],
-                        heatmapRegions: [
-                            { x: 30, y: 40, w: 120, h: 140, label: "Face region" },
-                            { x: 300, y: 80, w: 90, h: 70, label: "Background patch" }
-                        ],
-                        anomalies: [
-                            { time: 12, label: "Temporal distortion" },
-                            { time: 28, label: "Audio sync issue" }
-                        ],
-                        provenance: [
-                            { url: "https://example.com/original1.jpg", score: 0.82, date: "2025-09-19" }
-                        ],
-                        community: { flags: Math.floor(Math.random() * 20), verified: Math.floor(Math.random() * 5) },
-                        privacyMode,
-                        duration: 60
+                    clearInterval(interval);
+                    showModal({
+                        title: 'Error',
+                        message: 'API analysis is currently only supported for uploaded image files, not URLs.',
+                        onClose: hideModal
+                    });
+                    isAnalyzing = false;
+                    updateUI();
+                    return;
+                }
+
+                const prompt = `Analyze this image for signs of AI generation or manipulation. Respond with a JSON object. If you detect AI artifacts or manipulation, provide a "verdict" like 'Likely AI-Generated' or 'Likely Manipulated', a "confidence" score (0-100), and an array of "reasons" for your conclusion. If the image appears authentic, the "verdict" should be 'Likely Authentic' and the "confidence" should be low (e.g., < 40). Ensure the JSON object is properly formatted and includes the following keys: "verdict", "confidence", "reasons" (array of strings), "flaggedReason" (empty string), "provenance" (empty array), "community" (object with flags: 0, verified: 0), "duration" (0), and "anomalies" (empty array). The confidence score should be an integer.`;
+                const apiKey = ""; // Canvas will provide this at runtime
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: filePreview.type,
+                                    data: base64Data
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                      responseMimeType: "application/json",
+                      responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                          verdict: { type: "STRING" },
+                          confidence: { type: "INTEGER" },
+                          reasons: {
+                            type: "ARRAY",
+                            items: { type: "STRING" }
+                          },
+                          flaggedReason: { type: "STRING" },
+                          provenance: {
+                            type: "ARRAY",
+                            items: {
+                              type: "OBJECT",
+                              properties: {
+                                url: { type: "STRING" },
+                                score: { type: "NUMBER" },
+                                date: { type: "STRING" }
+                              }
+                            }
+                          },
+                          community: {
+                            type: "OBJECT",
+                            properties: {
+                              flags: { type: "INTEGER" },
+                              verified: { type: "INTEGER" }
+                            }
+                          },
+                          duration: { type: "INTEGER" },
+                          anomalies: {
+                            type: "ARRAY",
+                            items: {
+                              type: "OBJECT",
+                              properties: {
+                                time: { type: "INTEGER" },
+                                label: { type: "STRING" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                };
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+                let response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                let jsonString = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                let apiReport = {};
+                try {
+                    // Remove markdown wrapper
+                    jsonString = jsonString.replace(/```json\n|```/g, '').trim();
+                    apiReport = JSON.parse(jsonString);
+                } catch (e) {
+                    console.error("Failed to parse API response:", e);
+                    apiReport = {
+                        verdict: 'Unable to Analyze',
+                        confidence: 0,
+                        reasons: ['Could not parse response from AI model.'],
+                        flaggedReason: '',
+                        provenance: [],
+                        community: { flags: 0, verified: 0 },
+                        duration: 0,
+                        anomalies: []
                     };
                 }
-        
-                report = analysisReport;
-                history = [analysisReport, ...history].slice(0, 50);
+
+                report = {
+                    ...apiReport,
+                    id: Date.now().toString(36),
+                    source,
+                    file: filePreview || { url: pasteUrl || "", name: pasteUrl || "Pasted URL", size: 0 },
+                    // Ensure heatmapRegions is always present
+                    heatmapRegions: apiReport.heatmapRegions || [],
+                };
+                history = [report, ...history].slice(0, 50);
+            } catch (error) {
+                console.error("API call failed:", error);
+                let errorMessage = `Could not connect to the analysis service. Error: ${error.message}`;
+                if (error.name === 'AbortError') {
+                    errorMessage = "Analysis timed out. Please try again with a smaller file or a faster network connection.";
+                }
+                report = {
+                    id: Date.now().toString(36),
+                    source,
+                    file: filePreview || { url: pasteUrl || "", name: pasteUrl || "Pasted URL", size: 0 },
+                    verdict: 'Analysis Failed',
+                    confidence: 0,
+                    reasons: [errorMessage],
+                    provenance: [],
+                    community: { flags: 0, verified: 0 },
+                    privacyMode,
+                    duration: 0,
+                    anomalies: [],
+                    heatmapRegions: []
+                };
+                history = [report, ...history].slice(0, 50);
+            } finally {
+                clearInterval(interval);
                 isAnalyzing = false;
                 updateBadges();
                 updateUI();
-            }, 1500);
+            }
         }
 
         // Initial UI render
